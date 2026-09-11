@@ -9,20 +9,54 @@
 <body>
   <main class="page" id="view-sic">
     <div class="search-card" id="search-card">
-      <h1 class="heading">Type what sort of companies you are looking for:</h1>
-      <form id="search-form" class="search-form" autocomplete="off">
-        <input
-          type="text"
-          id="query-input"
-          name="query"
-          class="query-input"
-          placeholder="e.g. B2B businesses focused on SaaS, Media and Data"
-          aria-label="Business description"
-        />
-        <button type="submit" id="submit-button" class="submit-button" disabled>
-          Find SIC codes
+      <div class="mode-tabs" role="tablist">
+        <button type="button" id="mode-tab-describe" class="mode-tab active" role="tab" aria-selected="true">
+          Describe a business
         </button>
-      </form>
+        <button type="button" id="mode-tab-pick" class="mode-tab" role="tab" aria-selected="false">
+          Pick a SIC code
+        </button>
+      </div>
+
+      <div id="describe-mode" class="mode-panel">
+        <h1 class="heading">Type what sort of companies you are looking for:</h1>
+        <form id="search-form" class="search-form" autocomplete="off">
+          <input
+            type="text"
+            id="query-input"
+            name="query"
+            class="query-input"
+            placeholder="e.g. B2B businesses focused on SaaS, Media and Data"
+            aria-label="Business description"
+          />
+          <button type="submit" id="submit-button" class="submit-button" disabled>
+            Find SIC codes
+          </button>
+        </form>
+      </div>
+
+      <div id="pick-mode" class="mode-panel" hidden>
+        <h1 class="heading">Pick a SIC code to find it and related codes:</h1>
+        <form id="pick-form" class="search-form" autocomplete="off">
+          <div class="combobox" id="sic-combobox">
+            <input
+              type="text"
+              id="combobox-input"
+              class="query-input"
+              placeholder="Search SIC codes, e.g. 62012 or software"
+              role="combobox"
+              aria-expanded="false"
+              aria-autocomplete="list"
+              aria-controls="combobox-list"
+              autocomplete="off"
+            />
+            <div id="combobox-list" class="combobox-list" role="listbox" hidden></div>
+          </div>
+          <button type="submit" id="pick-submit-button" class="submit-button" disabled>
+            Find this and related SIC codes
+          </button>
+        </form>
+      </div>
     </div>
 
     <div id="status-region" class="status-region" aria-live="polite">

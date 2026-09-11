@@ -34,6 +34,27 @@ Only include SIC codes from the official Companies House condensed SIC code list
 Only include sections that have at least one relevant code. Order sections and
 codes by relevance, most relevant first.`;
 
+const RELATED_SYSTEM_PROMPT = `You are given a UK Companies House condensed SIC (Standard Industrial
+Classification) code. Suggest other SIC codes from the official Companies House
+condensed SIC code list that are closely related to it — for example, adjacent
+activities in the same industry, complementary business activities, or codes
+commonly used alongside it.
+
+Only include SIC codes from the official Companies House condensed SIC code list.
+Do not include the code that was given as input — only the related codes. Only
+include sections that have at least one relevant code. Order sections and codes
+by relevance, most relevant first.`;
+
+function mapAnthropicError(err) {
+  return err instanceof Anthropic.AuthenticationError
+    ? "The server is not correctly authenticated with the AI service."
+    : err instanceof Anthropic.RateLimitError
+      ? "The AI service is rate-limited right now. Please try again shortly."
+      : err instanceof Anthropic.APIError
+        ? `AI service error: ${err.message}`
+        : "Something went wrong contacting the AI service.";
+}
+
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -67,15 +88,42 @@ app.post("/api/sic-codes", async (req, res) => {
     res.json(response.parsed_output);
   } catch (err) {
     console.error(err);
-    const message =
-      err instanceof Anthropic.AuthenticationError
-        ? "The server is not correctly authenticated with the AI service."
-        : err instanceof Anthropic.RateLimitError
-          ? "The AI service is rate-limited right now. Please try again shortly."
-          : err instanceof Anthropic.APIError
-            ? `AI service error: ${err.message}`
-            : "Something went wrong contacting the AI service.";
-    res.status(502).json({ error: message });
+    res.status(502).json({ error: mapAnthropicError(err) });
+  }
+});
+
+app.post("/api/related-sic-codes", async (req, res) => {
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
+
+  if (!code) {
+    return res.status(400).json({ error: "A SIC code is required." });
+  }
+
+  try {
+    const response = await client.beta.messages.parse({
+      model: "claude-opus-5",
+      max_tokens: 4096,
+      system: RELATED_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `Can you suggest a list of all the SIC codes that are related to ${code}${description ? ` (${description})` : ""}`,
+        },
+      ],
+      output_format: betaZodOutputFormat(SicResultSchema),
+    });
+
+    if (!response.parsed_output) {
+      return res
+        .status(502)
+        .json({ error: "The AI response could not be understood. Please try again." });
+    }
+
+    res.json(response.parsed_output);
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: mapAnthropicError(err) });
   }
 });
 

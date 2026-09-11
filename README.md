@@ -2,8 +2,9 @@
 
 An internal, localhost-only tool:
 
-1. Describe a type of business in plain English and get back relevant UK Companies
-   House SIC codes, grouped by section.
+1. Describe a type of business in plain English **or** pick an exact SIC code from a
+   searchable dropdown of the full official list — either way you get back relevant
+   SIC codes, grouped by section.
 2. Curate that list, then click **Find Companies** to pull every active/open company
    registered against those SIC codes from the real Companies House API, view them in
    a sortable/filterable table, and download the combined result as a CSV.
@@ -35,10 +36,19 @@ Then open http://localhost:3000
 ## How it works
 
 - `public/` is a static, no-build-step frontend: `index.html`, `app.js` (SIC code
-  search + results), `companies.js` (company search results view), `styles.css`.
+  search + results, both entry modes), `companies.js` (company search results view),
+  `styles.css`, and `data/sic-codes.json` — the full official Companies House
+  condensed SIC code list (730 codes, grouped into the 21 standard sections),
+  sourced from [companieshouse/sic-code-data](https://github.com/companieshouse/sic-code-data)
+  on GitHub and shipped as a static asset for the "Pick a SIC code" dropdown — no
+  network call needed to populate it, and no API key required for that part.
 - `server.js` is a small Express server, both API keys stay server-side:
   - `POST /api/sic-codes` calls the Claude API (`claude-opus-5`) with structured
     outputs to get back reliably-shaped JSON (section letter/name + codes).
+  - `POST /api/related-sic-codes` powers "Pick a SIC code": given a code selected
+    from the dropdown, asks Claude for related codes, same structured contract.
+    The originally selected code is always merged back into the result client-side
+    (into its real section), even if the model doesn't repeat it.
   - `POST /api/find-companies` takes the curated SIC code list, queries the
     Companies House Advanced Search API (`company_status=active,open`) once per
     code — paginating up to a 2,000-company cap per code — and streams progress
