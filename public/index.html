@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="page" id="page">
+  <main class="page" id="view-sic">
     <div class="search-card" id="search-card">
       <h1 class="heading">Type what sort of companies you are looking for:</h1>
       <form id="search-form" class="search-form" autocomplete="off">
@@ -40,10 +40,71 @@
         <p>No matching SIC codes found. Try rephrasing your description.</p>
       </div>
 
+      <div id="results-actions" class="results-actions" hidden>
+        <button type="button" id="find-companies-button" class="submit-button">
+          Find Companies
+        </button>
+      </div>
+
       <div id="results" class="results" hidden></div>
     </div>
   </main>
 
-  <script src="app.js"></script>
+  <main class="page" id="view-companies" hidden>
+    <div class="companies-header">
+      <button type="button" id="back-to-sic-button" class="back-button">&larr; Back to SIC codes</button>
+      <h1 class="heading">Find Companies</h1>
+    </div>
+
+    <div id="companies-progress" class="loading-state" hidden aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="companies-progress-text"></p>
+    </div>
+
+    <div id="companies-setup-error" class="error-state" hidden>
+      <p id="companies-setup-error-message" class="error-message"></p>
+      <button type="button" id="companies-retry-button" class="retry-button">Try again</button>
+    </div>
+
+    <div id="companies-summary" class="summary-banner" hidden></div>
+
+    <div id="companies-failures" class="failures-panel" hidden></div>
+
+    <div id="companies-controls" class="companies-controls" hidden>
+      <input
+        type="text"
+        id="companies-filter"
+        class="query-input"
+        placeholder="Filter by name, number, address or SIC code"
+        aria-label="Filter companies"
+      />
+      <button type="button" id="download-csv-button" class="submit-button">Download CSV</button>
+    </div>
+
+    <div id="companies-table-wrap" class="table-wrap" hidden>
+      <table class="companies-table">
+        <thead>
+          <tr>
+            <th data-sort="companyName">Company Name</th>
+            <th data-sort="companyNumber">Company Number</th>
+            <th data-sort="companyStatus">Status</th>
+            <th data-sort="companyType">Company Type</th>
+            <th data-sort="incorporationDate">Incorporation Date</th>
+            <th>Registered Office Address</th>
+            <th>Matched SIC Code(s)</th>
+          </tr>
+        </thead>
+        <tbody id="companies-table-body"></tbody>
+      </table>
+      <div id="companies-pagination" class="pagination"></div>
+    </div>
+
+    <div id="companies-empty" class="empty-state" hidden>
+      <p>No companies found for the selected SIC codes.</p>
+    </div>
+  </main>
+
+  <script type="module" src="app.js"></script>
+  <script type="module" src="companies.js"></script>
 </body>
 </html>

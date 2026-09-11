@@ -5,6 +5,7 @@ import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { RateLimiter, searchSicCode } from "./lib/companiesHouse.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,6 +76,91 @@ app.post("/api/sic-codes", async (req, res) => {
             ? `AI service error: ${err.message}`
             : "Something went wrong contacting the AI service.";
     res.status(502).json({ error: message });
+  }
+});
+
+app.post("/api/find-companies", async (req, res) => {
+  const apiKey = process.env.COMPANIES_HOUSE_API_KEY;
+  const sicCodes = Array.isArray(req.body?.sicCodes)
+    ? req.body.sicCodes.filter((c) => c && typeof c.code === "string" && c.code.trim())
+    : [];
+
+  if (!apiKey) {
+    return res
+      .status(400)
+      .json({ error: "Companies House API key not configured — see setup instructions." });
+  }
+  if (sicCodes.length === 0) {
+    return res.status(400).json({ error: "At least one SIC code is required." });
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-cache",
+  });
+  const writeEvent = (event) => res.write(`${JSON.stringify(event)}\n`);
+
+  const rateLimiter = new RateLimiter();
+  const combined = new Map();
+  const breakdown = [];
+  const failures = [];
+
+  for (let i = 0; i < sicCodes.length; i++) {
+    const { code, description } = sicCodes[i];
+    writeEvent({ type: "progress", currentIndex: i + 1, total: sicCodes.length, code, description });
+
+    try {
+      const { companies, totalHits } = await searchSicCode({ apiKey, sicCode: code, rateLimiter });
+
+      for (const company of companies) {
+        const existing = combined.get(company.companyNumber);
+        if (existing) {
+          existing.matchedSicCodes.add(code);
+        } else {
+          combined.set(company.companyNumber, { ...company, matchedSicCodes: new Set([code]) });
+        }
+      }
+
+      breakdown.push({ code, description, count: companies.length, totalHits });
+      writeEvent({ type: "code-complete", code, description, count: companies.length, totalHits });
+    } catch (err) {
+      console.error(`SIC code ${code} failed:`, err);
+      failures.push({ code, description, message: err.message });
+      writeEvent({ type: "code-error", code, description, message: err.message });
+    }
+  }
+
+  const companies = [...combined.values()].map((c) => ({ ...c, matchedSicCodes: [...c.matchedSicCodes] }));
+  writeEvent({ type: "done", companies, breakdown, failures });
+  res.end();
+});
+
+app.post("/api/find-companies/retry-code", async (req, res) => {
+  const apiKey = process.env.COMPANIES_HOUSE_API_KEY;
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  const description = typeof req.body?.description === "string" ? req.body.description : undefined;
+
+  if (!apiKey) {
+    return res
+      .status(400)
+      .json({ error: "Companies House API key not configured — see setup instructions." });
+  }
+  if (!code) {
+    return res.status(400).json({ error: "A SIC code is required." });
+  }
+
+  try {
+    const rateLimiter = new RateLimiter();
+    const { companies, totalHits } = await searchSicCode({ apiKey, sicCode: code, rateLimiter });
+    res.json({
+      code,
+      description,
+      totalHits,
+      companies: companies.map((c) => ({ ...c, matchedSicCodes: [code] })),
+    });
+  } catch (err) {
+    console.error(`Retry for SIC code ${code} failed:`, err);
+    res.status(502).json({ error: err.message });
   }
 });
 

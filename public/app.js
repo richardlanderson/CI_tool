@@ -5,7 +5,7 @@ const state = {
   errorMessage: undefined,
 };
 
-const page = document.getElementById("page");
+const page = document.getElementById("view-sic");
 const form = document.getElementById("search-form");
 const input = document.getElementById("query-input");
 const submitButton = document.getElementById("submit-button");
@@ -14,7 +14,9 @@ const errorState = document.getElementById("error-state");
 const errorMessageEl = document.getElementById("error-message");
 const retryButton = document.getElementById("retry-button");
 const emptyState = document.getElementById("empty-state");
+const resultsActionsEl = document.getElementById("results-actions");
 const resultsEl = document.getElementById("results");
+const findCompaniesButton = document.getElementById("find-companies-button");
 
 function render() {
   page.classList.toggle("has-results", state.status !== "idle");
@@ -22,13 +24,15 @@ function render() {
   loadingState.hidden = state.status !== "loading";
   errorState.hidden = state.status !== "error";
   emptyState.hidden = !(state.status === "success" && state.sections.length === 0);
-  resultsEl.hidden = !(state.status === "success" && state.sections.length > 0);
+  const hasResults = state.status === "success" && state.sections.length > 0;
+  resultsEl.hidden = !hasResults;
+  resultsActionsEl.hidden = !hasResults;
 
   if (state.status === "error") {
     errorMessageEl.textContent = state.errorMessage || "Something went wrong.";
   }
 
-  if (state.status === "success" && state.sections.length > 0) {
+  if (hasResults) {
     renderResults();
   }
 }
@@ -138,5 +142,18 @@ form.addEventListener("submit", (event) => {
 retryButton.addEventListener("click", () => {
   if (state.query) runSearch(state.query);
 });
+
+findCompaniesButton.addEventListener("click", () => {
+  const sicCodes = state.sections.flatMap((section) =>
+    section.codes.map((c) => ({ code: c.code, description: c.description })),
+  );
+  window.SicApp?.showCompaniesView?.(sicCodes);
+});
+
+window.SicApp = window.SicApp || {};
+window.SicApp.showSicView = () => {
+  document.getElementById("view-sic").hidden = false;
+  document.getElementById("view-companies").hidden = true;
+};
 
 render();
