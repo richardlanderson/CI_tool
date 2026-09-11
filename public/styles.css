@@ -300,7 +300,7 @@ body {
 
 #view-companies > * {
   width: 100%;
-  max-width: 900px;
+  max-width: 1600px;
 }
 
 .summary-banner {
@@ -363,6 +363,7 @@ body {
 
 .companies-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.9rem;
 }
@@ -373,12 +374,48 @@ body {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-}
-
-.companies-table td {
-  max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.companies-table th:nth-child(1),
+.companies-table td:nth-child(1) {
+  width: 18%;
+}
+
+.companies-table th:nth-child(2),
+.companies-table td:nth-child(2) {
+  width: 11%;
+}
+
+.companies-table th:nth-child(3),
+.companies-table td:nth-child(3) {
+  width: 6%;
+}
+
+.companies-table th:nth-child(4),
+.companies-table td:nth-child(4) {
+  width: 9%;
+}
+
+.companies-table th:nth-child(5),
+.companies-table td:nth-child(5) {
+  width: 10%;
+}
+
+.companies-table th:nth-child(6),
+.companies-table td:nth-child(6) {
+  width: 24%;
+}
+
+.companies-table th:nth-child(7),
+.companies-table td:nth-child(7) {
+  width: 9%;
+}
+
+.companies-table th:nth-child(8),
+.companies-table td:nth-child(8) {
+  width: 13%;
 }
 
 .companies-table thead th {
@@ -442,11 +479,13 @@ body {
   }
 }
 
-.actions-cell {
+.companies-table td.actions-cell {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   white-space: nowrap;
+  overflow: visible;
 }
 
 .details-toggle {
@@ -479,8 +518,10 @@ body {
   background: color-mix(in srgb, var(--accent) 4%, var(--card-bg));
 }
 
-.details-cell {
+.companies-table td.details-cell {
   white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   padding: 16px 20px !important;
 }
 

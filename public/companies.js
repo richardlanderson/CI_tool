@@ -215,7 +215,7 @@ function buildActionsCell(company) {
   const detailsBtn = document.createElement("button");
   detailsBtn.type = "button";
   detailsBtn.className = "details-toggle";
-  detailsBtn.textContent = isExpanded ? "Hide details ▲" : "Officers & PSC ▼";
+  detailsBtn.textContent = isExpanded ? "Hide ▲" : "Officers/PSC ▼";
   detailsBtn.setAttribute("aria-expanded", String(isExpanded));
   detailsBtn.addEventListener("click", () => toggleDetails(company.companyNumber));
 
