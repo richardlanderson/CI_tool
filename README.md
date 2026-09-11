@@ -11,6 +11,9 @@ An internal, localhost-only tool:
 3. Per company, on demand: expand **Officers & PSC** to see current directors and
    persons with significant control (fetched from Companies House only when you
    expand a row), or open a **LinkedIn** search for that company name in a new tab.
+4. Click **Find Connections** to check every company in the list for shared
+   individuals — the same director or the same person with significant control
+   appearing at more than one of the companies you found.
 
 ## Setup
 
@@ -60,6 +63,17 @@ Then open http://localhost:3000
   - `GET /api/companies/:companyNumber/details` fetches that one company's current
     officers and persons with significant control, on demand — called only when
     you expand a row, not for the whole result set.
+  - `POST /api/find-connections` checks officers + PSC for every company in the
+    current list (streaming progress the same way as Find Companies) and groups
+    people who appear at more than one of them. Directors are matched by
+    Companies House's own stable officer ID (from the officer's `appointments`
+    link) — reliable, since it's the same identifier CH itself uses to track one
+    person across all their directorships. Persons with significant control have
+    no equivalent cross-company ID exposed by this endpoint, so those are matched
+    by name + birth month/year as a best-effort heuristic — the UI labels this
+    match type distinctly ("unverified") so it isn't mistaken for the same
+    certainty as an officer match. A company whose lookup fails doesn't stop the
+    run; it's listed separately and the rest still complete.
   - `lib/companiesHouse.js` holds the Companies House client, including a single
     shared sliding-window rate limiter (600 requests / 5 minutes, per the API's
     published limit) used by every route that calls Companies House, since the

@@ -21,6 +21,17 @@ let activeRunToken = 0;
 const expandedCompanies = new Set();
 const detailsByCompany = new Map(); // companyNumber -> { status: 'loading'|'success'|'error', officers, officersTotal, pscs, pscsTotal, errorMessage }
 
+const connectionsState = {
+  status: "idle", // idle | running | success | error
+  currentIndex: 0,
+  total: 0,
+  progressLabel: "",
+  connections: [],
+  failures: [],
+  errorMessage: undefined,
+};
+let activeConnectionsToken = 0;
+
 const progressPanel = document.getElementById("companies-progress");
 const progressText = document.getElementById("companies-progress-text");
 const setupErrorPanel = document.getElementById("companies-setup-error");
@@ -37,6 +48,17 @@ const tableBody = document.getElementById("companies-table-body");
 const paginationEl = document.getElementById("companies-pagination");
 const emptyState = document.getElementById("companies-empty");
 const backButton = document.getElementById("back-to-sic-button");
+
+const findConnectionsButton = document.getElementById("find-connections-button");
+const connectionsProgressPanel = document.getElementById("connections-progress");
+const connectionsProgressText = document.getElementById("connections-progress-text");
+const connectionsSetupErrorPanel = document.getElementById("connections-setup-error");
+const connectionsSetupErrorMessage = document.getElementById("connections-setup-error-message");
+const connectionsRetryButton = document.getElementById("connections-retry-button");
+const connectionsPanel = document.getElementById("connections-panel");
+const connectionsSummaryEl = document.getElementById("connections-summary");
+const connectionsFailuresPanel = document.getElementById("connections-failures");
+const connectionsListEl = document.getElementById("connections-list");
 
 function render() {
   progressPanel.hidden = companiesState.status !== "running";
@@ -528,6 +550,20 @@ function handleEvent(event, myToken) {
   render();
 }
 
+function resetConnections() {
+  activeConnectionsToken++;
+  Object.assign(connectionsState, {
+    status: "idle",
+    currentIndex: 0,
+    total: 0,
+    progressLabel: "",
+    connections: [],
+    failures: [],
+    errorMessage: undefined,
+  });
+  renderConnections();
+}
+
 async function runSearch(sicCodes) {
   const myToken = ++activeRunToken;
   sicCodesForRun = sicCodes;
@@ -548,6 +584,7 @@ async function runSearch(sicCodes) {
   filterInput.value = "";
   expandedCompanies.clear();
   detailsByCompany.clear();
+  resetConnections();
   updateSortIndicators();
   render();
 
@@ -588,6 +625,173 @@ async function runSearch(sicCodes) {
     render();
   }
 }
+
+function formatRole(role) {
+  return role === "psc" ? "PSC" : formatLabel(role);
+}
+
+function renderConnections() {
+  connectionsProgressPanel.hidden = connectionsState.status !== "running";
+  if (connectionsState.status === "running") {
+    connectionsProgressText.textContent = connectionsState.progressLabel || "Starting…";
+  }
+
+  connectionsSetupErrorPanel.hidden = connectionsState.status !== "error";
+  if (connectionsState.status === "error") {
+    connectionsSetupErrorMessage.textContent = connectionsState.errorMessage || "Something went wrong.";
+  }
+
+  const done = connectionsState.status === "success";
+  connectionsPanel.hidden = !done;
+  if (!done) return;
+
+  const count = connectionsState.connections.length;
+  connectionsSummaryEl.textContent =
+    count === 0
+      ? "No individuals found connected across more than one of these companies."
+      : `Found ${count} individual${count === 1 ? "" : "s"} connected across more than one company.`;
+
+  connectionsFailuresPanel.hidden = connectionsState.failures.length === 0;
+  if (!connectionsFailuresPanel.hidden) {
+    connectionsFailuresPanel.innerHTML = "";
+    const heading = document.createElement("p");
+    heading.className = "failures-heading";
+    heading.textContent = `${connectionsState.failures.length} compan${connectionsState.failures.length === 1 ? "y" : "ies"} could not be checked:`;
+    connectionsFailuresPanel.appendChild(heading);
+    for (const failure of connectionsState.failures) {
+      const row = document.createElement("div");
+      row.className = "failure-row";
+      const label = document.createElement("span");
+      label.textContent = `${failure.companyName} (${failure.companyNumber}): ${failure.message}`;
+      row.appendChild(label);
+      connectionsFailuresPanel.appendChild(row);
+    }
+  }
+
+  connectionsListEl.innerHTML = "";
+  for (const connection of connectionsState.connections) {
+    const card = document.createElement("div");
+    card.className = "connection-card";
+
+    const header = document.createElement("div");
+    header.className = "connection-header";
+
+    const name = document.createElement("span");
+    name.className = "connection-name";
+    name.textContent = connection.name;
+
+    const badge = document.createElement("span");
+    badge.className = connection.matchType === "officer" ? "connection-badge" : "connection-badge heuristic";
+    badge.textContent =
+      connection.matchType === "officer" ? "Matched: officer ID" : "Matched: name (PSC, unverified)";
+
+    header.append(name, badge);
+    card.appendChild(header);
+
+    const companiesEl = document.createElement("div");
+    companiesEl.className = "connection-companies";
+    for (const c of connection.companies) {
+      const row = document.createElement("div");
+      row.className = "connection-company-row";
+
+      const companyName = document.createElement("span");
+      companyName.className = "connection-company-name";
+      companyName.textContent = c.companyName;
+
+      const roles = document.createElement("span");
+      roles.className = "connection-company-roles";
+      roles.textContent = `(${c.roles.map(formatRole).join(", ")})`;
+
+      row.append(companyName, roles);
+      companiesEl.appendChild(row);
+    }
+    card.appendChild(companiesEl);
+
+    connectionsListEl.appendChild(card);
+  }
+}
+
+function handleConnectionsEvent(event, myToken) {
+  if (myToken !== activeConnectionsToken) return;
+
+  if (event.type === "progress") {
+    connectionsState.currentIndex = event.currentIndex;
+    connectionsState.total = event.total;
+    connectionsState.progressLabel = `Checking officers and PSC for company ${event.currentIndex} of ${event.total} (${event.companyName})…`;
+  } else if (event.type === "company-error") {
+    connectionsState.failures.push({
+      companyNumber: event.companyNumber,
+      companyName: event.companyName,
+      message: event.message,
+    });
+  } else if (event.type === "done") {
+    connectionsState.connections = event.connections;
+    connectionsState.failures = event.failures;
+    connectionsState.status = "success";
+  }
+  renderConnections();
+}
+
+async function runFindConnections() {
+  if (companiesState.companies.length === 0) return;
+
+  const myToken = ++activeConnectionsToken;
+  Object.assign(connectionsState, {
+    status: "running",
+    currentIndex: 0,
+    total: companiesState.companies.length,
+    progressLabel: "",
+    connections: [],
+    failures: [],
+    errorMessage: undefined,
+  });
+  renderConnections();
+
+  const companies = companiesState.companies.map((c) => ({
+    companyNumber: c.companyNumber,
+    companyName: c.companyName,
+  }));
+
+  try {
+    const response = await fetch("/api/find-connections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companies }),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error || `Request failed (${response.status})`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    for (;;) {
+      if (myToken !== activeConnectionsToken) return;
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex;
+      while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line) handleConnectionsEvent(JSON.parse(line), myToken);
+      }
+    }
+    if (buffer.trim()) handleConnectionsEvent(JSON.parse(buffer.trim()), myToken);
+  } catch (err) {
+    if (myToken !== activeConnectionsToken) return;
+    connectionsState.status = "error";
+    connectionsState.errorMessage = err instanceof Error ? err.message : "Something went wrong.";
+    renderConnections();
+  }
+}
+
+findConnectionsButton.addEventListener("click", runFindConnections);
+connectionsRetryButton.addEventListener("click", runFindConnections);
 
 tableHead.addEventListener("click", (event) => {
   const th = event.target.closest("th[data-sort]");

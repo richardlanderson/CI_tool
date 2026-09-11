@@ -113,6 +113,9 @@
         aria-label="Filter companies"
       />
       <button type="button" id="download-csv-button" class="submit-button">Download CSV</button>
+      <button type="button" id="find-connections-button" class="submit-button secondary">
+        Find Connections
+      </button>
     </div>
 
     <div id="companies-table-wrap" class="table-wrap" hidden>
@@ -136,6 +139,23 @@
 
     <div id="companies-empty" class="empty-state" hidden>
       <p>No companies found for the selected SIC codes.</p>
+    </div>
+
+    <div id="connections-progress" class="loading-state" hidden aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="connections-progress-text"></p>
+    </div>
+
+    <div id="connections-setup-error" class="error-state" hidden>
+      <p id="connections-setup-error-message" class="error-message"></p>
+      <button type="button" id="connections-retry-button" class="retry-button">Try again</button>
+    </div>
+
+    <div id="connections-panel" class="connections-panel" hidden>
+      <h2 class="connections-heading">Connections</h2>
+      <p id="connections-summary" class="connections-summary"></p>
+      <div id="connections-failures" class="failures-panel" hidden></div>
+      <div id="connections-list" class="connections-list"></div>
     </div>
   </main>
 

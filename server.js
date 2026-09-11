@@ -5,7 +5,12 @@ import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { sharedRateLimiter, searchSicCode, fetchCompanyDetails } from "./lib/companiesHouse.js";
+import {
+  sharedRateLimiter,
+  searchSicCode,
+  fetchCompanyDetails,
+  fetchCompanyPeople,
+} from "./lib/companiesHouse.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -242,6 +247,76 @@ app.get("/api/companies/:companyNumber/details", async (req, res) => {
     console.error(`Officer/PSC lookup for ${companyNumber} failed:`, err);
     res.status(502).json({ error: err.message });
   }
+});
+
+app.post("/api/find-connections", async (req, res) => {
+  const apiKey = process.env.COMPANIES_HOUSE_API_KEY;
+  const companies = Array.isArray(req.body?.companies)
+    ? req.body.companies.filter((c) => c && typeof c.companyNumber === "string" && c.companyNumber.trim())
+    : [];
+
+  if (!apiKey) {
+    return res
+      .status(400)
+      .json({ error: "Companies House API key not configured — see setup instructions." });
+  }
+  if (companies.length === 0) {
+    return res.status(400).json({ error: "At least one company is required." });
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-cache",
+  });
+  const writeEvent = (event) => res.write(`${JSON.stringify(event)}\n`);
+
+  const identities = new Map(); // identityKey -> { name, matchType, companies: Map<companyNumber, { companyName, roles: Set }> }
+  const failures = [];
+
+  for (let i = 0; i < companies.length; i++) {
+    const { companyNumber, companyName } = companies[i];
+    writeEvent({ type: "progress", currentIndex: i + 1, total: companies.length, companyNumber, companyName });
+
+    try {
+      const people = await fetchCompanyPeople({ apiKey, companyNumber, rateLimiter: sharedRateLimiter });
+
+      for (const person of people) {
+        if (!identities.has(person.identityKey)) {
+          identities.set(person.identityKey, {
+            name: person.name,
+            matchType: person.matchType,
+            companies: new Map(),
+          });
+        }
+        const identity = identities.get(person.identityKey);
+        if (!identity.companies.has(companyNumber)) {
+          identity.companies.set(companyNumber, { companyName, roles: new Set() });
+        }
+        identity.companies.get(companyNumber).roles.add(person.role);
+      }
+    } catch (err) {
+      console.error(`Connections lookup for ${companyNumber} failed:`, err);
+      failures.push({ companyNumber, companyName, message: err.message });
+      writeEvent({ type: "company-error", companyNumber, companyName, message: err.message });
+    }
+  }
+
+  const connections = [...identities.entries()]
+    .map(([identityKey, identity]) => ({
+      identityKey,
+      name: identity.name,
+      matchType: identity.matchType,
+      companies: [...identity.companies.entries()].map(([companyNumber, c]) => ({
+        companyNumber,
+        companyName: c.companyName,
+        roles: [...c.roles],
+      })),
+    }))
+    .filter((c) => c.companies.length >= 2)
+    .sort((a, b) => b.companies.length - a.companies.length || a.name.localeCompare(b.name));
+
+  writeEvent({ type: "done", connections, failures, companiesChecked: companies.length });
+  res.end();
 });
 
 const PORT = process.env.PORT || 3000;
