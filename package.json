@@ -1,0 +1,17 @@
+{
+  "name": "sic-code-finder",
+  "version": "1.0.0",
+  "description": "Internal tool to find relevant UK Companies House SIC codes for a business description using Claude.",
+  "type": "module",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "zod": "^4.6.2"
+  }
+}

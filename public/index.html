@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIC Code Finder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page" id="page">
+    <div class="search-card" id="search-card">
+      <h1 class="heading">Type what sort of companies you are looking for:</h1>
+      <form id="search-form" class="search-form" autocomplete="off">
+        <input
+          type="text"
+          id="query-input"
+          name="query"
+          class="query-input"
+          placeholder="e.g. B2B businesses focused on SaaS, Media and Data"
+          aria-label="Business description"
+        />
+        <button type="submit" id="submit-button" class="submit-button" disabled>
+          Find SIC codes
+        </button>
+      </form>
+    </div>
+
+    <div id="status-region" class="status-region" aria-live="polite">
+      <div id="loading-state" class="loading-state" hidden>
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Finding relevant SIC codes&hellip;</p>
+      </div>
+
+      <div id="error-state" class="error-state" hidden>
+        <p id="error-message" class="error-message"></p>
+        <button type="button" id="retry-button" class="retry-button">Try again</button>
+      </div>
+
+      <div id="empty-state" class="empty-state" hidden>
+        <p>No matching SIC codes found. Try rephrasing your description.</p>
+      </div>
+
+      <div id="results" class="results" hidden></div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
