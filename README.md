@@ -7,6 +7,9 @@ An internal, localhost-only tool:
 2. Curate that list, then click **Find Companies** to pull every active/open company
    registered against those SIC codes from the real Companies House API, view them in
    a sortable/filterable table, and download the combined result as a CSV.
+3. Per company, on demand: expand **Officers & PSC** to see current directors and
+   persons with significant control (fetched from Companies House only when you
+   expand a row), or open a **LinkedIn** search for that company name in a new tab.
 
 ## Setup
 
@@ -44,14 +47,25 @@ Then open http://localhost:3000
     match more than one searched code.
   - `POST /api/find-companies/retry-code` retries a single SIC code that failed,
     without re-running the whole search.
-  - `lib/companiesHouse.js` holds the Companies House client, including a sliding-
-    window rate limiter (600 requests / 5 minutes, per the API's published limit).
+  - `GET /api/companies/:companyNumber/details` fetches that one company's current
+    officers and persons with significant control, on demand — called only when
+    you expand a row, not for the whole result set.
+  - `lib/companiesHouse.js` holds the Companies House client, including a single
+    shared sliding-window rate limiter (600 requests / 5 minutes, per the API's
+    published limit) used by every route that calls Companies House, since the
+    limit is per API key across the whole app, not per request.
 - Deleting a SIC code, filtering/sorting/paginating the companies table, and CSV
-  export are all client-side — no extra network calls.
+  export are all client-side — no extra network calls. Officers/PSC data is cached
+  client-side per company after first fetch (re-expanding doesn't refetch) and is
+  never included in the CSV export.
+- The LinkedIn link opens LinkedIn's own company search for that name — it's a
+  search link, not a verified direct profile link (LinkedIn has no public API for
+  this, and scraping their site would violate their Terms of Service), so you
+  confirm the right match yourself.
 
 ## Out of scope (v1)
 
 No auth, no persistence beyond the current session (the CSV download is the durable
 output), no validation of LLM-returned codes against the official SIC list, and no
-Companies House enrichment (officers, PSCs, filings) — see the requirements doc for
-fast-follows.
+employee headcount data (Companies House doesn't publish this as structured data —
+see the requirements doc for fast-follows).

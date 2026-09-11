@@ -5,7 +5,7 @@ import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { RateLimiter, searchSicCode } from "./lib/companiesHouse.js";
+import { sharedRateLimiter, searchSicCode, fetchCompanyDetails } from "./lib/companiesHouse.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -100,7 +100,6 @@ app.post("/api/find-companies", async (req, res) => {
   });
   const writeEvent = (event) => res.write(`${JSON.stringify(event)}\n`);
 
-  const rateLimiter = new RateLimiter();
   const combined = new Map();
   const breakdown = [];
   const failures = [];
@@ -110,7 +109,11 @@ app.post("/api/find-companies", async (req, res) => {
     writeEvent({ type: "progress", currentIndex: i + 1, total: sicCodes.length, code, description });
 
     try {
-      const { companies, totalHits } = await searchSicCode({ apiKey, sicCode: code, rateLimiter });
+      const { companies, totalHits } = await searchSicCode({
+        apiKey,
+        sicCode: code,
+        rateLimiter: sharedRateLimiter,
+      });
 
       for (const company of companies) {
         const existing = combined.get(company.companyNumber);
@@ -150,8 +153,11 @@ app.post("/api/find-companies/retry-code", async (req, res) => {
   }
 
   try {
-    const rateLimiter = new RateLimiter();
-    const { companies, totalHits } = await searchSicCode({ apiKey, sicCode: code, rateLimiter });
+    const { companies, totalHits } = await searchSicCode({
+      apiKey,
+      sicCode: code,
+      rateLimiter: sharedRateLimiter,
+    });
     res.json({
       code,
       description,
@@ -160,6 +166,32 @@ app.post("/api/find-companies/retry-code", async (req, res) => {
     });
   } catch (err) {
     console.error(`Retry for SIC code ${code} failed:`, err);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+app.get("/api/companies/:companyNumber/details", async (req, res) => {
+  const apiKey = process.env.COMPANIES_HOUSE_API_KEY;
+  const companyNumber = req.params.companyNumber;
+
+  if (!apiKey) {
+    return res
+      .status(400)
+      .json({ error: "Companies House API key not configured — see setup instructions." });
+  }
+  if (!/^[A-Za-z0-9]+$/.test(companyNumber)) {
+    return res.status(400).json({ error: "Invalid company number." });
+  }
+
+  try {
+    const details = await fetchCompanyDetails({
+      apiKey,
+      companyNumber,
+      rateLimiter: sharedRateLimiter,
+    });
+    res.json(details);
+  } catch (err) {
+    console.error(`Officer/PSC lookup for ${companyNumber} failed:`, err);
     res.status(502).json({ error: err.message });
   }
 });
